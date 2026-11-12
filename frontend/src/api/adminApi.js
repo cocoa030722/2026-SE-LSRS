@@ -20,9 +20,11 @@ export const adminApi = {
 
   // US-07 시험 기간·정책 파라미터
   getExamPeriods: () => apiClient.get('/admin/exam-periods'),
+  /** body: { startDate, endDate } (yyyy-MM-dd) */
   createExamPeriod: (body) => apiClient.post('/admin/exam-periods', body),
-  // TODO(US-07): 설계서에는 DELETE /admin/exam-periods 만 있다. 경로 변수 형태는 백엔드와 맞춘다.
   deleteExamPeriod: (examPeriodId) => apiClient.delete(`/admin/exam-periods/${examPeriodId}`),
+  getPolicies: () => apiClient.get('/admin/policies'),
+  /** body: { policyValue } */
   updatePolicy: (policyKey, body) => apiClient.put(`/admin/policies/${policyKey}`, body),
 
   // US-15 사용 통계

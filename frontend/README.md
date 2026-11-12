@@ -1,6 +1,8 @@
 # LSRS Frontend
 
-도서관 좌석 예약 시스템의 React 클라이언트. 현재는 **스켈레톤**이다. 라우트 트리·레이아웃·API 엔드포인트 모듈·화면/컴포넌트 골격만 있고, 권한 가드·토큰 처리·각 화면 기능은 모두 `TODO(US-xx)` 주석과 화면의 점선 박스(`Placeholder`)로 표시되어 있다.
+도서관 좌석 예약 시스템의 React 클라이언트. **구현된 기능은 US-07(예약 정책·시험 기간)과 US-08(내 예약 조회·직접 취소)뿐**이다. 나머지는 스켈레톤으로, 권한 가드·토큰 처리·각 화면 기능이 `TODO(US-xx)` 주석과 화면의 점선 박스(`Placeholder`)로 표시되어 있다.
+
+로그인(US-02)이 없어서 `/reservations`는 지금 서버에서 401(로그인 필요)을 받는다. 시험 기간 등록도 등록한 관리자를 기록해야 하므로 마찬가지다.
 
 ## 실행
 
@@ -27,7 +29,7 @@ src/
   components/   화면 조각. props만 받아 그린다 (common / seat / reservation / qr / admin)
   constants/    역할·예약 상태·좌석 상태·취소 사유
   hooks/        useAutoRefresh (대시보드 30초 갱신 등, 미구현 스텁)
-  utils/        apiError ({ code, message } 오류 응답 해석, 미구현 스텁)
+  utils/        apiError ({ code, message } 오류 응답 해석), format (시간대 표시)
 ```
 
 원칙: 업무 규칙(정책 판정, 중복 검사, 권한 판단)은 서버에 두고 클라이언트는 표시와 입력만 맡는다 (설계서 2장). 화면 단 권한 가드는 편의 기능일 뿐이다.
@@ -45,7 +47,7 @@ src/
 | `/account` | AccountPage (비밀번호 변경·탈퇴) | US-03, 04 |
 | `/admin` | DashboardPage | US-12 |
 | `/admin/students` | StudentManagementPage (제한 관리·강제 취소) | US-13, 14 |
-| `/admin/policies` | PolicyManagementPage (시험 기간·정책 파라미터) | US-07, 11 |
+| `/admin/policies` | PolicyManagementPage (시험 기간·정책 파라미터) | US-07 |
 | `/admin/statistics` | StatisticsPage | US-15 |
 | `/admin/users` | UserRoleManagementPage | US-16 |
 | `/kiosk` | CheckInKioskPage | US-09 |
@@ -53,6 +55,5 @@ src/
 ## 백엔드와 맞춰야 할 가칭
 
 - 좌석 상태 코드 (`constants/seatStatus.js`)
-- 취소 사유 코드 (`constants/cancelReasons.js`)
+- 관리자 강제 취소 사유 코드 (`constants/cancelReasons.js`의 `ADMIN_CANCEL_REASONS`) — 학생 취소 사유는 백엔드와 일치
 - 단말기 키 헤더 이름 (`api/deviceClient.js`)
-- 시험 기간 삭제 경로, 정책 파라미터 목록 조회 출처 (`api/adminApi.js`, `PolicyManagementPage`)

@@ -202,3 +202,192 @@ body {
 .seat--reserved {
   background: var(--seat-reserved);
 }
+
+/* 버튼·폼 */
+button {
+  padding: 4px 12px;
+  font: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+button.primary {
+  color: #fff;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+input,
+select {
+  padding: 4px 8px;
+  font: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.status-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.inline-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.inline-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.policy-value-input {
+  width: 80px;
+}
+
+.hint {
+  margin: 4px 0 8px;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.notice {
+  padding: 8px 12px;
+  color: #116329;
+  background: #dafbe1;
+  border-radius: 4px;
+}
+
+.loading {
+  color: var(--color-muted);
+}
+
+/* 표 */
+.panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.panel h3 {
+  margin: 0 0 4px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+}
+
+.data-table th,
+.data-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-table th {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* 예약 상태 배지 */
+.status-badge {
+  padding: 2px 8px;
+  font-size: 0.8125rem;
+  border-radius: 10px;
+  background: #eaeef2;
+}
+
+.status--reserved {
+  color: #0550ae;
+  background: #ddf4ff;
+}
+
+.status--checked_in {
+  color: #116329;
+  background: #dafbe1;
+}
+
+.status--auto_cancelled {
+  color: var(--color-danger);
+  background: #ffebe9;
+}
+
+/* 정책 안내 (US-07 AC3) */
+.policy-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 10px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.policy-notice--exam {
+  background: #fff8c5;
+  border-color: var(--seat-reserved);
+}
+
+.policy-notice--exam .policy-max-hours {
+  font-weight: 700;
+}
+
+/* 대화상자 */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 40%);
+}
+
+.dialog {
+  width: min(400px, 90vw);
+  padding: 20px;
+  background: var(--color-surface);
+  border-radius: 8px;
+}
+
+.dialog h3 {
+  margin: 0 0 8px;
+}
+
+.dialog-summary {
+  margin: 0 0 12px;
+  color: var(--color-muted);
+}
+
+.reason-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
