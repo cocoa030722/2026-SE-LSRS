@@ -1,0 +1,204 @@
+/* 기본 스타일. 디자인 고도화는 Sprint 2(UI/UX) 범위다. */
+:root {
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-border: #d8dce3;
+  --color-text: #1f2328;
+  --color-muted: #656d76;
+  --color-primary: #2f6feb;
+  --color-danger: #cf222e;
+
+  /* 좌석 상태 색상 (FR-R-02) */
+  --seat-available: #2da44e;
+  --seat-in-use: #8c959f;
+  --seat-mine: #2f6feb;
+  --seat-reserved: #d4a72c;
+
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* 레이아웃 */
+.main-layout {
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 24px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-nav {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+}
+
+.app-nav a {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.app-nav a.active {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.app-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-content {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.auth-layout {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  padding: 32px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.kiosk-layout {
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.brand {
+  font-weight: 700;
+}
+
+.auth-card .brand {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+}
+
+/* 공통 */
+.page-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.page-header h2 {
+  margin: 0;
+}
+
+.story-tags {
+  display: flex;
+  gap: 4px;
+}
+
+.story-tag {
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+}
+
+.placeholder {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+}
+
+.placeholder-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+}
+
+.placeholder-todos {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.empty-state {
+  color: var(--color-muted);
+}
+
+.error-message {
+  color: var(--color-danger);
+}
+
+.error-page {
+  padding: 48px;
+  text-align: center;
+}
+
+/* 좌석 */
+.seat-legend {
+  display: flex;
+  gap: 16px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.seat-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.seat-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.seat--available {
+  background: var(--seat-available);
+}
+
+.seat--in_use {
+  background: var(--seat-in-use);
+}
+
+.seat--mine {
+  background: var(--seat-mine);
+}
+
+.seat--reserved {
+  background: var(--seat-reserved);
+}
