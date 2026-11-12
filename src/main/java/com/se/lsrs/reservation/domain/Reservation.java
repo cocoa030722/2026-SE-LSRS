@@ -20,10 +20,15 @@ import jakarta.persistence.Table;
 
 /**
  * 예약 (설계서 3장 Reservation).
- * 생성(US-06)은 해당 담당이 구현한다. 상태 전이는 WHERE status='RESERVED' 조건부 UPDATE로 수행한다.
+ * 생성은 create()(US-06)로 RESERVED 상태로만 만든다. 상태 전이는 WHERE status='RESERVED' 조건부 UPDATE로 수행한다.
+ *
+ * 인덱스 (설계서 3장): 좌석 겹침 (seat_id, start_at, end_at), 본인 이력·겹침 (user_id, start_at),
+ * 스케줄러 조회 (status, start_at).
  */
 @Entity
-@Table(indexes = @Index(name = "idx_reservation_user_start", columnList = "user_id, start_at"))
+@Table(indexes = { @Index(name = "idx_reservation_user_start", columnList = "user_id, start_at"),
+		@Index(name = "idx_reservation_seat_time", columnList = "seat_id, start_at, end_at"),
+		@Index(name = "idx_reservation_status_start", columnList = "status, start_at") })
 public class Reservation {
 
 	@Id
@@ -65,6 +70,22 @@ public class Reservation {
 	protected Reservation() {
 	}
 
+	private Reservation(User user, Seat seat, LocalDateTime startAt, LocalDateTime endAt, LocalDateTime createdAt) {
+		this.user = user;
+		this.seat = seat;
+		this.startAt = startAt;
+		this.endAt = endAt;
+		this.status = ReservationStatus.RESERVED;
+		this.penaltyApplied = false;
+		this.createdAt = createdAt;
+	}
+
+	/** 새 예약 (US-06 AC1). 검증(정책·제한·겹침)은 ReservationService.reserve 가 마친 뒤 호출한다. */
+	public static Reservation create(User user, Seat seat, LocalDateTime startAt, LocalDateTime endAt,
+			LocalDateTime now) {
+		return new Reservation(user, seat, startAt, endAt, now);
+	}
+
 	public Long getReservationId() {
 		return reservationId;
 	}
@@ -99,6 +120,10 @@ public class Reservation {
 
 	public boolean isPenaltyApplied() {
 		return penaltyApplied;
+	}
+
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
 	}
 
 }

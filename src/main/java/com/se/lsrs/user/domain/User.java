@@ -12,7 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * 회원 (설계서 3장 User). 테이블 매핑만 둔다.
+ * 회원 (설계서 3장 User). 이용 제한 판정 isRestricted()(US-06 AC3)만 둔다.
  * 생성(US-01)·노쇼 반영 addNoShow()/해제 release()(US-11) 등 동작은 각 담당이 추가한다.
  */
 @Entity
@@ -66,6 +66,15 @@ public class User {
 
 	public UserStatus getStatus() {
 		return status;
+	}
+
+	public LocalDateTime getRestrictedUntil() {
+		return restrictedUntil;
+	}
+
+	/** 이용 제한 중인지 (US-06 AC3). 해제 시각이 지났으면 release() 전이라도 제한하지 않는다. */
+	public boolean isRestricted(LocalDateTime now) {
+		return restrictedUntil != null && restrictedUntil.isAfter(now);
 	}
 
 }

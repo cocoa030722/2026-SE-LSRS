@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -26,6 +27,7 @@ import com.se.lsrs.policy.domain.ExamPeriod;
 import com.se.lsrs.policy.domain.PolicySetting;
 import com.se.lsrs.policy.service.AppliedPolicy;
 import com.se.lsrs.policy.service.ExamPeriodService;
+import com.se.lsrs.policy.service.OperatingHours;
 import com.se.lsrs.policy.service.PolicyService;
 
 
@@ -43,6 +45,11 @@ class PolicyControllerTest {
 	@MockitoBean
 	private ExamPeriodService examPeriodService;
 
+	@BeforeEach
+	void operatingHours() {
+		given(policyService.operatingHours()).willReturn(new OperatingHours(5, 24));
+	}
+
 	@Test
 	void 현재_정책을_조회한다_AC3() throws Exception {
 		given(policyService.currentPolicy())
@@ -50,6 +57,8 @@ class PolicyControllerTest {
 
 		mockMvc.perform(get("/api/policies/current"))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.openHour").value(5))
+			.andExpect(jsonPath("$.closeHour").value(24))
 			.andExpect(jsonPath("$.examPeriod").value(true))
 			.andExpect(jsonPath("$.maxHours").value(3))
 			.andExpect(jsonPath("$.reservableFrom").value("2026-12-01"))

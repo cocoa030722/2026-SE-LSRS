@@ -28,8 +28,8 @@ public class PolicyController {
 	@GetMapping("/current")
 	public CurrentPolicyResponse current(
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-		return CurrentPolicyResponse
-			.from(date == null ? policyService.currentPolicy() : policyService.policyFor(date));
+		return CurrentPolicyResponse.from(date == null ? policyService.currentPolicy() : policyService.policyFor(date),
+				policyService.operatingHours());
 	}
 
 }

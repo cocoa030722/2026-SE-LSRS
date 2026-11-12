@@ -52,7 +52,10 @@ class PolicyRepositoryTest {
 	@Test
 	void 정책_기본값이_DB에_있다() {
 		assertThat(policySettingRepository.findAllByOrderByPolicyKeyAsc()).extracting(PolicySetting::getPolicyKey)
-			.contains("NORMAL_DAYS", "NORMAL_MAX_HOURS", "EXAM_DAYS", "EXAM_MAX_HOURS", "CHECKIN_WINDOW_MIN");
+			.contains("NORMAL_DAYS", "NORMAL_MAX_HOURS", "EXAM_DAYS", "EXAM_MAX_HOURS", "CHECKIN_WINDOW_MIN",
+					"OPEN_HOUR", "CLOSE_HOUR");
+		assertThat(policySettingRepository.findById("OPEN_HOUR").orElseThrow().getPolicyValue()).isEqualTo("5");
+		assertThat(policySettingRepository.findById("CLOSE_HOUR").orElseThrow().getPolicyValue()).isEqualTo("24");
 		assertThat(policySettingRepository.findById("NORMAL_DAYS").orElseThrow().getPolicyValue()).isEqualTo("7");
 		assertThat(policySettingRepository.findById("EXAM_MAX_HOURS").orElseThrow().getPolicyValue()).isEqualTo("3");
 	}

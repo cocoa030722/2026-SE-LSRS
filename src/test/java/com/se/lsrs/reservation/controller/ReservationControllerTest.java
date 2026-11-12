@@ -3,6 +3,7 @@ package com.se.lsrs.reservation.controller;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,6 +23,7 @@ import com.se.lsrs.common.error.ErrorCode;
 import com.se.lsrs.reservation.domain.CancelReason;
 import com.se.lsrs.reservation.domain.ReservationStatus;
 import com.se.lsrs.reservation.dto.MyReservationResponse;
+import com.se.lsrs.reservation.dto.ReservationResponse;
 import com.se.lsrs.reservation.service.ReservationService;
 
 @WebMvcTest(ReservationController.class)
@@ -38,6 +40,63 @@ class ReservationControllerTest {
 	private static MyReservationResponse item(long id, ReservationStatus status, CancelReason reason,
 			boolean cancellable) {
 		return new MyReservationResponse(id, "A-01", START, START.plusHours(2), status, reason, cancellable);
+	}
+
+	@Test
+	void 예약을_생성하면_201과_좌석_시간_정보_US06_AC1() throws Exception {
+		given(reservationService.reserve(3L, START, START.plusHours(2))).willReturn(new ReservationResponse(100L, 3L,
+				"A-03", START, START.plusHours(2), ReservationStatus.RESERVED, START.minusHours(3)));
+
+		mockMvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"seatId\":3,\"startAt\":\"2026-12-01T13:00:00\",\"endAt\":\"2026-12-01T15:00:00\"}"))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.reservationId").value(100))
+			.andExpect(jsonPath("$.seatNo").value("A-03"))
+			.andExpect(jsonPath("$.startAt").value("2026-12-01T13:00:00"))
+			.andExpect(jsonPath("$.endAt").value("2026-12-01T15:00:00"))
+			.andExpect(jsonPath("$.status").value("RESERVED"));
+	}
+
+	@Test
+	void 좌석이나_시간대를_선택하지_않으면_400_US06_AC2() throws Exception {
+		mockMvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"startAt\":\"2026-12-01T13:00:00\",\"endAt\":\"2026-12-01T15:00:00\"}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+			.andExpect(jsonPath("$.message").value("좌석을 선택해 주세요."));
+		mockMvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content("{\"seatId\":3}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+	}
+
+	@Test
+	void 좌석_충돌과_본인_중복은_서로_다른_코드의_409_US06_AC2_AC4() throws Exception {
+		given(reservationService.reserve(3L, START, START.plusHours(2)))
+			.willThrow(new BusinessException(ErrorCode.SEAT_ALREADY_RESERVED));
+		given(reservationService.reserve(4L, START, START.plusHours(2)))
+			.willThrow(new BusinessException(ErrorCode.DUPLICATE_RESERVATION));
+
+		mockMvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"seatId\":3,\"startAt\":\"2026-12-01T13:00:00\",\"endAt\":\"2026-12-01T15:00:00\"}"))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("SEAT_ALREADY_RESERVED"))
+			.andExpect(jsonPath("$.message").value("이미 예약된 좌석입니다."));
+		mockMvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"seatId\":4,\"startAt\":\"2026-12-01T13:00:00\",\"endAt\":\"2026-12-01T15:00:00\"}"))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("DUPLICATE_RESERVATION"));
+	}
+
+	@Test
+	void 이용_제한_학생은_403_US06_AC3() throws Exception {
+		given(reservationService.reserve(3L, START, START.plusHours(2))).willThrow(
+				new BusinessException(ErrorCode.USER_RESTRICTED, "이용 제한 중입니다. 2026-12-08 10:00 이후에 예약할 수 있습니다."));
+
+		mockMvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"seatId\":3,\"startAt\":\"2026-12-01T13:00:00\",\"endAt\":\"2026-12-01T15:00:00\"}"))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("USER_RESTRICTED"))
+			.andExpect(jsonPath("$.message").value("이용 제한 중입니다. 2026-12-08 10:00 이후에 예약할 수 있습니다."));
 	}
 
 	@Test
