@@ -3,7 +3,8 @@
  * - 학생 좌석 그리드 4종: FR-R-02 / US-05 AC2
  * - 관리자 축소 그리드 3종: FR-A-02 / US-12 AC2
  *
- * TODO(US-05, US-12): 코드 값은 가칭이다. 백엔드 응답 스키마가 확정되면 값을 맞춘다.
+ * 학생 그리드 4종은 백엔드 SeatStatus 와 같다 (GET /api/seats 의 status).
+ * TODO(US-12): 관리자 축소 그리드 코드 값은 가칭이다. 백엔드 응답 스키마가 확정되면 값을 맞춘다.
  */
 export const SeatStatus = Object.freeze({
   AVAILABLE: 'AVAILABLE',

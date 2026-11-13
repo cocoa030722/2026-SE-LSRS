@@ -2,7 +2,10 @@ import { apiClient } from './client.js';
 
 /** 학생 예약 API (설계서 4장, US-06·08·09) */
 export const reservationApi = {
-  /** US-06: 예약 생성 */
+  /**
+   * US-06: 예약 생성. body: { seatId, startAt, endAt } (정시 'YYYY-MM-DDTHH:00:00', utils/timeSlot toLocalDateTime)
+   * 응답: { reservationId, seatId, seatNo, startAt, endAt, status, createdAt } (201)
+   */
   create: (body) => apiClient.post('/reservations', body),
   /**
    * US-08: 내 예약 이력(최신순). params: { status } (생략 시 전체)

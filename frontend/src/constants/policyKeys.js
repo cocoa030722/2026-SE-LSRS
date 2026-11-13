@@ -5,4 +5,6 @@ export const POLICY_KEY_LABEL = Object.freeze({
   EXAM_DAYS: '시험 기간 예약 가능 기간 (오늘 ~ +N일)',
   EXAM_MAX_HOURS: '시험 기간 최대 이용 시간 (시간)',
   CHECKIN_WINDOW_MIN: '체크인 가능 시간 (분)',
+  OPEN_HOUR: '운영 시작 시각 (시, 0~23)',
+  CLOSE_HOUR: '운영 종료 시각 (시, 1~24)',
 });

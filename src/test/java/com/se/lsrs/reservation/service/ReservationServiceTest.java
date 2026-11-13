@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -17,10 +19,13 @@ import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -31,9 +36,14 @@ import com.se.lsrs.policy.service.PolicyService;
 import com.se.lsrs.reservation.domain.CancelReason;
 import com.se.lsrs.reservation.domain.Reservation;
 import com.se.lsrs.reservation.domain.ReservationStatus;
+import com.se.lsrs.common.error.BusinessException;
 import com.se.lsrs.reservation.dto.MyReservationResponse;
+import com.se.lsrs.reservation.dto.ReservationResponse;
 import com.se.lsrs.reservation.repository.ReservationRepository;
 import com.se.lsrs.seat.domain.Seat;
+import com.se.lsrs.seat.repository.SeatRepository;
+import com.se.lsrs.user.domain.User;
+import com.se.lsrs.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ReservationServiceTest {
@@ -53,6 +63,12 @@ class ReservationServiceTest {
 	private ReservationRepository reservationRepository;
 
 	@Mock
+	private UserRepository userRepository;
+
+	@Mock
+	private SeatRepository seatRepository;
+
+	@Mock
 	private PolicyService policyService;
 
 	@Mock
@@ -62,7 +78,8 @@ class ReservationServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		reservationService = new ReservationService(reservationRepository, policyService, currentUserProvider, CLOCK);
+		reservationService = new ReservationService(reservationRepository, userRepository, seatRepository, policyService,
+				currentUserProvider, CLOCK);
 		lenient().when(currentUserProvider.currentUserId()).thenReturn(STUDENT_ID);
 		lenient().when(policyService.getInt(PolicyKey.CHECKIN_WINDOW_MIN)).thenReturn(15);
 	}
@@ -77,6 +94,126 @@ class ReservationServiceTest {
 		lenient().when(reservation.getStartAt()).thenReturn(startAt);
 		lenient().when(reservation.getEndAt()).thenReturn(startAt.plusHours(2));
 		return reservation;
+	}
+
+	@Nested
+	@DisplayName("예약 생성 (US-06)")
+	class Reserve {
+
+		private static final Long SEAT_ID = 3L;
+
+		/** 오늘 13:00 ~ 15:00 */
+		private final LocalDateTime startAt = NOW.withHour(13);
+
+		private final LocalDateTime endAt = NOW.withHour(15);
+
+		private User student;
+
+		private Seat seat;
+
+		@BeforeEach
+		void setUp() {
+			student = mock(User.class);
+			lenient().when(student.isRestricted(NOW)).thenReturn(false);
+			seat = mock(Seat.class);
+			lenient().when(seat.getSeatId()).thenReturn(SEAT_ID);
+			lenient().when(seat.getSeatNo()).thenReturn("A-03");
+			lenient().when(seat.isActive()).thenReturn(true);
+			lenient().when(userRepository.findByIdForUpdate(STUDENT_ID)).thenReturn(Optional.of(student));
+			lenient().when(seatRepository.findByIdForUpdate(SEAT_ID)).thenReturn(Optional.of(seat));
+			lenient().when(reservationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+		}
+
+		@Test
+		void 검증을_통과하면_RESERVED_로_생성한다_AC1() {
+			ReservationResponse result = reservationService.reserve(SEAT_ID, startAt, endAt);
+
+			assertThat(result.status()).isEqualTo(ReservationStatus.RESERVED);
+			assertThat(result.seatId()).isEqualTo(SEAT_ID);
+			assertThat(result.seatNo()).isEqualTo("A-03");
+			assertThat(result.startAt()).isEqualTo(startAt);
+			assertThat(result.endAt()).isEqualTo(endAt);
+			assertThat(result.createdAt()).isEqualTo(NOW);
+			verify(policyService).validateReservation(startAt, endAt);
+		}
+
+		@Test
+		void 학생_좌석_잠금을_모두_획득한_뒤_제한_정책_겹침을_검사한다_CoreFlow1() {
+			reservationService.reserve(SEAT_ID, startAt, endAt);
+
+			InOrder order = inOrder(userRepository, seatRepository, student, policyService, reservationRepository);
+			order.verify(userRepository).findByIdForUpdate(STUDENT_ID);
+			order.verify(seatRepository).findByIdForUpdate(SEAT_ID);
+			order.verify(student).isRestricted(NOW);
+			order.verify(policyService).validateReservation(startAt, endAt);
+			order.verify(reservationRepository).existsActiveOverlapByUser(STUDENT_ID, startAt, endAt, NOW);
+			order.verify(reservationRepository).existsActiveOverlapBySeat(SEAT_ID, startAt, endAt, NOW);
+			order.verify(reservationRepository).save(any());
+		}
+
+		@Test
+		void 정책_위반이면_저장하지_않는다_US07_AC2() {
+			willThrow(new BusinessException(ErrorCode.RESERVATION_DURATION_EXCEEDED)).given(policyService)
+				.validateReservation(startAt, endAt);
+
+			assertThatThrownBy(() -> reservationService.reserve(SEAT_ID, startAt, endAt))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DURATION_EXCEEDED);
+			verify(reservationRepository, never()).existsActiveOverlapByUser(any(), any(), any(), any());
+			verify(reservationRepository, never()).save(any());
+		}
+
+		@Test
+		void 이미_시작된_시간대는_거부한다() {
+			LocalDateTime started = NOW.withHour(9);
+
+			assertThatThrownBy(() -> reservationService.reserve(SEAT_ID, started, started.plusHours(2)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+			verify(reservationRepository, never()).save(any());
+		}
+
+		@Test
+		void 이용_제한_중이면_해제일과_함께_거부한다_AC3() {
+			given(student.isRestricted(NOW)).willReturn(true);
+			given(student.getRestrictedUntil()).willReturn(LocalDateTime.of(2026, 12, 8, 10, 0));
+
+			assertThatThrownBy(() -> reservationService.reserve(SEAT_ID, startAt, endAt))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_RESTRICTED)
+				.hasMessageContaining("2026-12-08 10:00");
+			verify(policyService, never()).validateReservation(any(), any());
+			verify(reservationRepository, never()).save(any());
+		}
+
+		@Test
+		void 본인_예약과_시간대가_겹치면_거부한다_AC2() {
+			given(reservationRepository.existsActiveOverlapByUser(STUDENT_ID, startAt, endAt, NOW)).willReturn(true);
+
+			assertThatThrownBy(() -> reservationService.reserve(SEAT_ID, startAt, endAt))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_RESERVATION);
+			verify(reservationRepository, never()).existsActiveOverlapBySeat(any(), any(), any(), any());
+			verify(reservationRepository, never()).save(any());
+		}
+
+		@Test
+		void 좌석이_이미_예약됐으면_거부한다_AC4() {
+			given(reservationRepository.existsActiveOverlapBySeat(SEAT_ID, startAt, endAt, NOW)).willReturn(true);
+
+			assertThatThrownBy(() -> reservationService.reserve(SEAT_ID, startAt, endAt))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.SEAT_ALREADY_RESERVED)
+				.hasMessage("이미 예약된 좌석입니다.");
+			verify(reservationRepository, never()).save(any());
+		}
+
+		@Test
+		void 없거나_비활성인_좌석은_404() {
+			given(seat.isActive()).willReturn(false);
+
+			assertThatThrownBy(() -> reservationService.reserve(SEAT_ID, startAt, endAt))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.SEAT_NOT_FOUND);
+			assertThatThrownBy(() -> reservationService.reserve(99L, startAt, endAt))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.SEAT_NOT_FOUND);
+			verify(reservationRepository, never()).save(any());
+		}
+
 	}
 
 	@Test
