@@ -59,7 +59,7 @@ class PolicyServiceTest {
 	void setUp() {
 		policyService = new PolicyService(examPeriodRepository, policySettingRepository, CLOCK);
 		settings.putAll(Map.of("NORMAL_DAYS", "7", "NORMAL_MAX_HOURS", "4", "EXAM_DAYS", "1", "EXAM_MAX_HOURS", "3",
-				"CHECKIN_WINDOW_MIN", "15"));
+				"CHECKIN_WINDOW_MIN", "15", "OPEN_HOUR", "5", "CLOSE_HOUR", "24"));
 		given(policySettingRepository.findById(any())).willAnswer(invocation -> {
 			String key = invocation.getArgument(0);
 			return Optional.ofNullable(settings.get(key)).map(value -> new PolicySetting(key, value, null));
@@ -191,8 +191,79 @@ class PolicyServiceTest {
 	}
 
 	@Nested
+	@DisplayName("시간대 검증: 정시 1시간 단위·운영 시간 05~24시 (US-05·06)")
+	class TimeSlot {
+
+		@Test
+		void 운영_시간_양_끝까지_허용한다() {
+			assertThatCode(() -> policyService.validateTimeSlot(at(TODAY, 5), at(TODAY, 7))).doesNotThrowAnyException();
+			assertThatCode(() -> policyService.validateTimeSlot(at(TODAY, 22), TODAY.plusDays(1).atStartOfDay()))
+				.doesNotThrowAnyException();
+		}
+
+		@Test
+		void 운영_시간_밖이면_거부한다() {
+			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 4), at(TODAY, 6)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME)
+				.hasMessageContaining("05:00~24:00");
+			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 23), TODAY.plusDays(1).atTime(1, 0)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+		}
+
+		@Test
+		void 정시가_아니면_거부한다() {
+			assertThatThrownBy(() -> policyService.validateTimeSlot(TODAY.atTime(13, 30), at(TODAY, 15)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME)
+				.hasMessageContaining("정시");
+		}
+
+		@Test
+		void 종료가_시작보다_늦지_않으면_거부한다() {
+			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 15), at(TODAY, 15)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 15), at(TODAY, 13)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+		}
+
+		@Test
+		void 예약_검증은_시간대도_검사한다() {
+			assertThatThrownBy(() -> policyService.validateReservation(at(TODAY, 3), at(TODAY, 5)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+		}
+
+		@Test
+		void 운영_시간_값을_바꾸면_기준이_바뀐다() {
+			settings.put("OPEN_HOUR", "9");
+
+			assertThat(policyService.operatingHours()).isEqualTo(new OperatingHours(9, 24));
+			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 8), at(TODAY, 10)))
+				.hasMessageContaining("09:00~24:00");
+		}
+
+		@Test
+		void 예약_가능_기간_밖의_날짜는_조회도_거부한다_US05_AC4() {
+			assertThat(policyService.validateReservableDate(TODAY.plusDays(7)).maxHours()).isEqualTo(4);
+			assertThatThrownBy(() -> policyService.validateReservableDate(TODAY.plusDays(8)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY);
+			assertThatThrownBy(() -> policyService.validateReservableDate(TODAY.minusDays(1)))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY);
+		}
+
+	}
+
+	@Nested
 	@DisplayName("정책 파라미터 변경 (US-07 AC5)")
 	class UpdateSetting {
+
+		@Test
+		void 운영_시간은_범위_밖이면_400() {
+			given(policySettingRepository.findById("CLOSE_HOUR"))
+				.willReturn(Optional.of(new PolicySetting("CLOSE_HOUR", "24", null)));
+
+			assertThatThrownBy(() -> policyService.updateSetting("CLOSE_HOUR", "25"))
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_POLICY_VALUE)
+				.hasMessageContaining("1~24");
+		}
 
 		@Test
 		void 값과_변경_시각이_바뀐다() {

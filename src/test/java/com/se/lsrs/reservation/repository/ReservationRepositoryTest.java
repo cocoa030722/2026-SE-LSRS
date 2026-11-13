@@ -81,6 +81,62 @@ class ReservationRepositoryTest {
 	}
 
 	@Test
+	void 좌석_겹침은_맞닿은_구간을_제외하고_진행_중_예약만_센다_US06() {
+		LocalDateTime now = LocalDateTime.of(2026, 12, 1, 10, 0);
+		LocalDateTime dec2 = LocalDateTime.of(2026, 12, 2, 0, 0);
+
+		// 예약 11: 좌석 2, 12-02 13~15 RESERVED
+		assertThat(reservationRepository.existsActiveOverlapBySeat(2L, dec2.withHour(14), dec2.withHour(16), now))
+			.isTrue();
+		assertThat(reservationRepository.existsActiveOverlapBySeat(2L, dec2.withHour(15), dec2.withHour(17), now))
+			.isFalse();
+		assertThat(reservationRepository.existsActiveOverlapBySeat(2L, dec2.withHour(11), dec2.withHour(13), now))
+			.isFalse();
+		// 예약 12: CANCELLED 는 세지 않는다
+		LocalDateTime nov30 = LocalDateTime.of(2026, 11, 30, 0, 0);
+		assertThat(reservationRepository.existsActiveOverlapBySeat(1L, nov30.withHour(9), nov30.withHour(10),
+				nov30.withHour(8)))
+			.isFalse();
+	}
+
+	@Test
+	void 종료_시각이_지난_예약은_진행_중이_아니다() {
+		LocalDateTime dec1 = LocalDateTime.of(2026, 12, 1, 0, 0);
+
+		// 예약 10: 좌석 1, 12-01 09~11 CHECKED_IN
+		assertThat(reservationRepository.existsActiveOverlapBySeat(1L, dec1.withHour(10), dec1.withHour(12),
+				dec1.withHour(10)))
+			.isTrue();
+		assertThat(reservationRepository.existsActiveOverlapBySeat(1L, dec1.withHour(10), dec1.withHour(12),
+				dec1.withHour(11)))
+			.isFalse();
+	}
+
+	@Test
+	void 본인_시간대_겹침을_찾는다_US06_AC2() {
+		LocalDateTime now = LocalDateTime.of(2026, 12, 1, 10, 0);
+		LocalDateTime dec2 = LocalDateTime.of(2026, 12, 2, 0, 0);
+
+		assertThat(reservationRepository.existsActiveOverlapByUser(1L, dec2.withHour(14), dec2.withHour(15), now))
+			.isTrue();
+		assertThat(reservationRepository.existsActiveOverlapByUser(2L, dec2.withHour(14), dec2.withHour(15), now))
+			.isFalse();
+	}
+
+	@Test
+	void 시간대와_겹치는_진행_중_예약을_좌석별로_조회한다_US05() {
+		LocalDateTime now = LocalDateTime.of(2026, 12, 1, 10, 0);
+
+		assertThat(reservationRepository.findActiveOverlapping(LocalDateTime.of(2026, 12, 1, 10, 0),
+				LocalDateTime.of(2026, 12, 1, 12, 0), now))
+			.containsExactly(new SeatOccupancy(1L, 1L, ReservationStatus.CHECKED_IN));
+		assertThat(reservationRepository.findActiveOverlapping(LocalDateTime.of(2026, 12, 2, 5, 0),
+				LocalDateTime.of(2026, 12, 4, 0, 0), now))
+			.containsExactlyInAnyOrder(new SeatOccupancy(2L, 1L, ReservationStatus.RESERVED),
+					new SeatOccupancy(2L, 2L, ReservationStatus.RESERVED));
+	}
+
+	@Test
 	void 체크인_가능_시간이_지난_RESERVED_는_반영되지_않는다() {
 		LocalDateTime afterWindow = LocalDateTime.of(2026, 12, 2, 13, 1);
 

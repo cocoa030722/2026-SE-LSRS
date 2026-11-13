@@ -203,6 +203,41 @@ body {
   background: var(--seat-reserved);
 }
 
+/* 좌석 그리드 (US-05) */
+.seat-grid {
+  display: grid;
+  grid-auto-columns: minmax(56px, 1fr);
+  grid-auto-rows: 44px;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 12px;
+  overflow-x: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.seat {
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  border: 2px solid transparent;
+}
+
+.seat--selected {
+  outline: 3px solid var(--color-text);
+  outline-offset: 1px;
+}
+
+.time-slot-selector {
+  margin: 0 0 12px;
+}
+
+.reservation-panel h3 {
+  margin: 0 0 8px;
+}
+
 /* 버튼·폼 */
 button {
   padding: 4px 12px;

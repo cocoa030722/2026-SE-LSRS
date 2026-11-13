@@ -2,9 +2,11 @@ package com.se.lsrs.reservation.service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.se.lsrs.common.auth.CurrentUserProvider;
@@ -16,11 +18,16 @@ import com.se.lsrs.reservation.domain.CancelReason;
 import com.se.lsrs.reservation.domain.Reservation;
 import com.se.lsrs.reservation.domain.ReservationStatus;
 import com.se.lsrs.reservation.dto.MyReservationResponse;
+import com.se.lsrs.reservation.dto.ReservationResponse;
 import com.se.lsrs.reservation.repository.ReservationRepository;
+import com.se.lsrs.seat.domain.Seat;
+import com.se.lsrs.seat.repository.SeatRepository;
+import com.se.lsrs.user.domain.User;
+import com.se.lsrs.user.repository.UserRepository;
 
 /**
- * 예약 서비스. 이 클래스에는 내 예약 조회와 학생 직접 취소(US-08)만 있다.
- * 예약 생성 reserve()(US-06)와 강제 취소 cancelByAdmin()(US-14)은 각 담당이 추가한다.
+ * 예약 서비스. 예약 생성(US-06), 내 예약 조회와 학생 직접 취소(US-08)가 있다.
+ * 강제 취소 cancelByAdmin()(US-14)은 해당 담당이 추가한다.
  *
  * 취소 가능 조건 (FR-X-01, 설계서 3장): RESERVED 이고 now ≤ 시작 + CHECKIN_WINDOW_MIN.
  * 시작 전 '예약중'과 시작 후 체크인 가능 시간 안의 '체크인 대기'를 포함한다.
@@ -30,7 +37,13 @@ import com.se.lsrs.reservation.repository.ReservationRepository;
 @Transactional(readOnly = true)
 public class ReservationService {
 
+	private static final DateTimeFormatter RESTRICTION_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
 	private final ReservationRepository reservationRepository;
+
+	private final UserRepository userRepository;
+
+	private final SeatRepository seatRepository;
 
 	private final PolicyService policyService;
 
@@ -38,12 +51,63 @@ public class ReservationService {
 
 	private final Clock clock;
 
-	public ReservationService(ReservationRepository reservationRepository, PolicyService policyService,
-			CurrentUserProvider currentUserProvider, Clock clock) {
+	public ReservationService(ReservationRepository reservationRepository, UserRepository userRepository,
+			SeatRepository seatRepository, PolicyService policyService, CurrentUserProvider currentUserProvider,
+			Clock clock) {
 		this.reservationRepository = reservationRepository;
+		this.userRepository = userRepository;
+		this.seatRepository = seatRepository;
 		this.policyService = policyService;
 		this.currentUserProvider = currentUserProvider;
 		this.clock = clock;
+	}
+
+	/**
+	 * 예약 생성 (US-06, 설계서 Core Flow 1).
+	 *
+	 * 순서 (설계서 Core Flow 1 시퀀스): 학생 행 → 좌석 행 비관적 잠금을 먼저 모두 획득한 뒤
+	 * 이용 제한 → 정책 → 본인 겹침 → 좌석 겹침을 검사하고 저장한다. 잠금 순서(학생 → 좌석)는 고정이다.
+	 * 격리 수준을 READ COMMITTED 로 두어 잠금 뒤의 겹침 조회가 먼저 커밋된 예약을 반드시 읽게 한다
+	 * (MySQL 기본 REPEATABLE READ 의 스냅샷 읽기 차단). 같은 좌석·겹치는 시간대 동시 요청은 1건만 생성되고 (AC4),
+	 * 예외가 나면 전체가 롤백된다 (AC5).
+	 *
+	 * @throws BusinessException INVALID_RESERVATION_TIME·RESERVATION_DATE_OUT_OF_POLICY·RESERVATION_DURATION_EXCEEDED
+	 * (400), USER_RESTRICTED(403), SEAT_NOT_FOUND(404), DUPLICATE_RESERVATION·SEAT_ALREADY_RESERVED(409)
+	 */
+	@Transactional(isolation = Isolation.READ_COMMITTED)
+	public ReservationResponse reserve(Long seatId, LocalDateTime startAt, LocalDateTime endAt) {
+		Long userId = currentUserProvider.currentUserId();
+		LocalDateTime now = LocalDateTime.now(clock);
+
+		// 1. 잠금 획득: 학생 → 좌석
+		User user = userRepository.findByIdForUpdate(userId)
+			.orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHENTICATED));
+		Seat seat = seatRepository.findByIdForUpdate(seatId)
+			.filter(Seat::isActive)
+			.orElseThrow(() -> new BusinessException(ErrorCode.SEAT_NOT_FOUND));
+
+		// 2. 이용 제한 (AC3)
+		if (user.isRestricted(now)) {
+			throw new BusinessException(ErrorCode.USER_RESTRICTED, "이용 제한 중입니다. %s 이후에 예약할 수 있습니다."
+				.formatted(user.getRestrictedUntil().format(RESTRICTION_FORMAT)));
+		}
+
+		// 3. 정책: 시간대·예약 가능 기간·최대 이용 시간 (US-07 AC2), 이미 시작된 시간대
+		policyService.validateReservation(startAt, endAt);
+		if (startAt.isBefore(now)) {
+			throw new BusinessException(ErrorCode.INVALID_RESERVATION_TIME, "이미 시작된 시간대는 예약할 수 없습니다.");
+		}
+
+		// 4. 겹침: 본인 중복 (AC2, FR-R-11) → 좌석 충돌 (AC4)
+		if (reservationRepository.existsActiveOverlapByUser(userId, startAt, endAt, now)) {
+			throw new BusinessException(ErrorCode.DUPLICATE_RESERVATION);
+		}
+		if (reservationRepository.existsActiveOverlapBySeat(seatId, startAt, endAt, now)) {
+			throw new BusinessException(ErrorCode.SEAT_ALREADY_RESERVED);
+		}
+
+		Reservation saved = reservationRepository.save(Reservation.create(user, seat, startAt, endAt, now));
+		return ReservationResponse.from(saved);
 	}
 
 	/** 내 예약 이력 (US-08 AC1·2) */

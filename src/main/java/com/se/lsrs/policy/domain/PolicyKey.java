@@ -18,16 +18,31 @@ public enum PolicyKey {
 	/** 시험 기간 최대 이용 시간(시간) (FR-A-20) */
 	EXAM_MAX_HOURS(1),
 	/** 체크인 가능 시간(분). 이 시간 안의 RESERVED('체크인 대기')까지 학생이 직접 취소할 수 있다 (FR-C-02, FR-X-01) */
-	CHECKIN_WINDOW_MIN(1);
+	CHECKIN_WINDOW_MIN(1),
+	/** 운영 시작 시각(시, 0~23). 예약은 이 시각 이후 정시부터 받는다 (설계서 3장, US-05·06) */
+	OPEN_HOUR(0, 23),
+	/** 운영 종료 시각(시, 1~24). 24 는 다음 날 00:00 이다 (설계서 3장, US-05·06) */
+	CLOSE_HOUR(1, 24);
 
 	private final int minValue;
 
+	private final int maxValue;
+
 	PolicyKey(int minValue) {
+		this(minValue, Integer.MAX_VALUE);
+	}
+
+	PolicyKey(int minValue, int maxValue) {
 		this.minValue = minValue;
+		this.maxValue = maxValue;
 	}
 
 	public int minValue() {
 		return minValue;
+	}
+
+	public int maxValue() {
+		return maxValue;
 	}
 
 	public static Optional<PolicyKey> find(String name) {
