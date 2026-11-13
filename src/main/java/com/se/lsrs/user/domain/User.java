@@ -52,12 +52,41 @@ public class User {
 	protected User() {
 	}
 
+	public User(String loginId, String email, String passwordHash, Role role, UserStatus status) {
+        this.loginId = loginId;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.role = role;
+        this.status = status;
+        this.noShowCount = 0;
+        this.tokenVersion = 1;
+    }
+
+    public void activate() {
+        this.status = UserStatus.ACTIVE;
+    }
+
+    public void withdraw() {
+        this.status = UserStatus.WITHDRAWN;
+        this.loginId = "WITHDRAWN_" + this.userId;
+        this.email = "WITHDRAWN_" + this.userId + "@deleted.com";
+        this.tokenVersion++;
+    }
+
 	public Long getUserId() {
 		return userId;
 	}
 
 	public String getLoginId() {
 		return loginId;
+	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public String getPasswordHash() {
+		return passwordHash;
 	}
 
 	public Role getRole() {
@@ -67,6 +96,17 @@ public class User {
 	public UserStatus getStatus() {
 		return status;
 	}
+	public int getNoShowCount() {
+            return noShowCount;
+     }
+
+        public LocalDateTime getRestrictedUntil() {
+            return restrictedUntil;
+        }
+
+        public int getTokenVersion() {
+            return tokenVersion;
+        }
 
 	public LocalDateTime getRestrictedUntil() {
 		return restrictedUntil;
