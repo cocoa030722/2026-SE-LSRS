@@ -1,6 +1,7 @@
 package com.se.lsrs.reservation.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,6 +59,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 			order by r.startAt desc, r.reservationId desc
 			""")
 	List<Reservation> findMine(Long userId, ReservationStatus status);
+
+	/** 학생에게 해당 상태의 예약이 하나라도 있는지. 회원 탈퇴 가능 여부 판단에 쓴다 (US-04 AC2) */
+	boolean existsByUserUserIdAndStatusIn(Long userId, Collection<ReservationStatus> statuses);
 
 	/** 본인 예약만 조회한다. 다른 학생의 예약은 존재 여부도 드러내지 않는다 (US-02 AC5, NFR 4.5). */
 	Optional<Reservation> findByReservationIdAndUserUserId(Long reservationId, Long userId);

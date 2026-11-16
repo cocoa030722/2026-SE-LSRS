@@ -11,6 +11,10 @@ public enum ErrorCode {
 	// 공통
 	INVALID_INPUT(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않습니다."),
 	UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
+	/** US-02 AC2: 올바른 ID·비밀번호지만 이메일 인증 전(PENDING) */
+	EMAIL_NOT_VERIFIED(HttpStatus.UNAUTHORIZED, "이메일 인증이 필요합니다."),
+	/** US-04 AC2: 진행 중 예약 또는 이용 제한(패널티) 상태 */
+	WITHDRAW_NOT_ALLOWED(HttpStatus.CONFLICT, "진행 중인 예약 또는 패널티가 존재하여 탈퇴할 수 없습니다."),
 
 	// US-07 예약 정책
 	INVALID_EXAM_PERIOD(HttpStatus.BAD_REQUEST, "시험 기간의 시작일은 종료일보다 늦을 수 없습니다."),
