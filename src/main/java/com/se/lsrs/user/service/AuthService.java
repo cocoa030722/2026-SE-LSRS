@@ -1,6 +1,8 @@
 package com.se.lsrs.user.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,6 +45,8 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
+        validatePassword(rawPassword);
+
         if (userRepository.existsByLoginId(loginId)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "이미 사용 중인 아이디입니다.");
         }
@@ -66,6 +70,28 @@ public class AuthService {
         verificationTokenRepository.save(verificationToken);
 
         System.out.println("이메일 인증 토큰: " + token);
+    }
+
+    /** 비밀번호 규칙 (US-01 AC3): 8자 이상, 영문·숫자·특수문자 모두 포함. 부족한 항목을 안내한다. */
+    static void validatePassword(String rawPassword) {
+        List<String> lacking = new ArrayList<>();
+        if (rawPassword.length() < 8) {
+            lacking.add("8자 이상");
+        }
+        if (rawPassword.chars().noneMatch(c -> (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))) {
+            lacking.add("영문");
+        }
+        if (rawPassword.chars().noneMatch(Character::isDigit)) {
+            lacking.add("숫자");
+        }
+        if (rawPassword.chars().noneMatch(c -> !Character.isLetterOrDigit(c) && !Character.isWhitespace(c))) {
+            lacking.add("특수문자");
+        }
+        if (!lacking.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    "비밀번호는 8자 이상이며 영문·숫자·특수문자를 모두 포함해야 합니다. 보완할 항목: "
+                            + String.join(", ", lacking));
+        }
     }
 
     @Transactional
@@ -100,11 +126,18 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.UNAUTHENTICATED, "아이디 또는 비밀번호가 올바르지 않습니다."));
 
-        if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new BusinessException(ErrorCode.UNAUTHENTICATED, "로그인할 수 없는 계정입니다.");
+        // 비밀번호를 먼저 확인한다: 틀린 비밀번호로는 계정 상태(PENDING 등)를 알 수 없게 한다 (US-02 AC2)
+        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            throw new BusinessException(
+                    ErrorCode.UNAUTHENTICATED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+        if (user.getStatus() == UserStatus.PENDING) {
+            throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED,
+                    "이메일 인증이 필요합니다. 인증을 완료한 뒤 로그인해 주세요.");
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
             throw new BusinessException(
                     ErrorCode.UNAUTHENTICATED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }

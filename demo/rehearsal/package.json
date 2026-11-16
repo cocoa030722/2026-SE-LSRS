@@ -1,0 +1,7 @@
+{
+  "name": "lsrs-demo-rehearsal",
+  "private": true,
+  "type": "module",
+  "description": "데모 리허설용 브라우저 자동 점검(시연 순서 그대로). 사용법은 demo/스프린트1_데모_준비_및_실행.md 참고",
+  "dependencies": { "playwright-core": "^1.65.1" }
+}

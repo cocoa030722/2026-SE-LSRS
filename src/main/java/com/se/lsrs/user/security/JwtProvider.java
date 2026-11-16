@@ -17,6 +17,9 @@ import io.jsonwebtoken.security.Keys;
 @Component
 public class JwtProvider {
 
+    /** Access 토큰 유효 시간 1시간 (US-02 AC1) */
+    private static final long ACCESS_TOKEN_MILLIS = 60L * 60 * 1000;
+
     private final Key key;
 
     public JwtProvider(@Value("${app.jwt.secret}") String secret) {
@@ -25,7 +28,7 @@ public class JwtProvider {
 
     public String generateAccessToken(User user) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + 30 * 60 * 1000);
+        Date expiry = new Date(now.getTime() + ACCESS_TOKEN_MILLIS);
 
         return Jwts.builder()
                 .setSubject(user.getLoginId())
