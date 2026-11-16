@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,10 +34,12 @@ import com.se.lsrs.common.auth.CurrentUserProvider;
 
 /**
  * US-05·06 전 계층 통합 테스트 (MySQL Testcontainers). 인증(US-02) 대신 CurrentUserProvider 를 대체한다.
+ * 보안 필터는 @WithMockUser(학생 역할)로 통과시키고, 요청 사용자는 loginAs() 로 정한다.
  * 현재 시각은 2026-12-01 10:00 으로 고정한다. 데이터: fixture-reservations.sql + 학생 3(이용 제한)·4
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@WithMockUser(roles = "STUDENT")
 @Import({ TestcontainersConfiguration.class, Us05Us06IntegrationTest.FixedClockConfig.class })
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
