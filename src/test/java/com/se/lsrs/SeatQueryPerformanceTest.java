@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,9 +37,11 @@ import com.se.lsrs.common.auth.CurrentUserProvider;
  * 좌석 조회 API 응답 시간 500ms 이내 (US-05 AC5, 설계서 1장: 좌석 200석·예약 1만 건).
  * MySQL Testcontainers 에서 GET /api/seats 전 계층(MockMvc)을 측정한다. 워밍업 후 10회 모두 500ms 이내여야 한다.
  * 현재 시각은 2026-12-01 10:00 으로 고정한다. 데이터: fixture-performance.sql
+ * 보안 필터(US-02)는 @WithMockUser(학생 역할)로 통과시키고, 요청 사용자는 CurrentUserProvider 로 정한다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@WithMockUser(roles = "STUDENT")
 @Import({ TestcontainersConfiguration.class, SeatQueryPerformanceTest.FixedClockConfig.class })
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional

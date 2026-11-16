@@ -13,6 +13,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -26,7 +27,9 @@ import com.se.lsrs.reservation.dto.MyReservationResponse;
 import com.se.lsrs.reservation.dto.ReservationResponse;
 import com.se.lsrs.reservation.service.ReservationService;
 
+// 컨트롤러 매핑·검증·오류 응답만 확인한다. 보안 필터(SecurityConfig)는 통합 테스트(Us05Us06·Us07Us08)에서 검증한다.
 @WebMvcTest(ReservationController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ReservationControllerTest {
 
 	private static final LocalDateTime START = LocalDateTime.of(2026, 12, 1, 13, 0);

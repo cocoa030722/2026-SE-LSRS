@@ -2,6 +2,8 @@ package com.se.lsrs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -23,6 +25,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,6 +36,7 @@ import com.se.lsrs.common.auth.CurrentUserProvider;
 
 /**
  * US-07·08 전 계층 통합 테스트 (MySQL Testcontainers). 인증(US-02) 대신 CurrentUserProvider 를 대체한다.
+ * 보안 필터는 @WithMockUser 로 통과시킨다: US-08 은 학생, US-07 은 관리자(/api/admin/** 는 ADMIN 전용).
  * 현재 시각은 2026-12-01 10:00 으로 고정한다. 데이터: fixture-reservations.sql
  */
 @SpringBootTest
@@ -75,6 +79,7 @@ class Us07Us08IntegrationTest {
 	}
 
 	@Test
+	@WithMockUser(roles = "STUDENT")
 	void US08_내_예약_조회_필터_직접_취소() throws Exception {
 		// AC1: 본인 예약만 최신순, 취소 가능 여부
 		mockMvc.perform(get("/api/reservations/me"))
@@ -127,6 +132,7 @@ class Us07Us08IntegrationTest {
 	}
 
 	@Test
+	@WithMockUser(roles = "ADMIN")
 	void US07_시험_기간_설정과_정책_적용() throws Exception {
 		// 평상시: 오늘 ~ +7일, 4시간
 		mockMvc.perform(get("/api/policies/current"))
@@ -139,6 +145,14 @@ class Us07Us08IntegrationTest {
 			.andExpect(jsonPath("$.examPeriod").value(true))
 			.andExpect(jsonPath("$.reservableUntil").value("2026-12-02"))
 			.andExpect(jsonPath("$.maxHours").value(3));
+
+		// 관리자 전용: 학생은 403, 미인증은 401 (US-02 AC3·4, SecurityConfig)
+		mockMvc.perform(get("/api/admin/exam-periods").with(user("20260001").roles("STUDENT")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+		mockMvc.perform(get("/api/admin/exam-periods").with(anonymous()))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
 
 		// AC4: 잘못된 기간·겹치는 기간 거부
 		mockMvc.perform(post("/api/admin/exam-periods").contentType(MediaType.APPLICATION_JSON)

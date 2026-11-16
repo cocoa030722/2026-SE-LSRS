@@ -10,6 +10,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,7 +21,9 @@ import com.se.lsrs.seat.domain.SeatStatus;
 import com.se.lsrs.seat.dto.SeatStatusResponse;
 import com.se.lsrs.seat.service.SeatQueryService;
 
+// 컨트롤러 매핑·검증·오류 응답만 확인한다. 보안 필터(SecurityConfig)는 통합 테스트(Us05Us06·Us07Us08)에서 검증한다.
 @WebMvcTest(SeatController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class SeatControllerTest {
 
 	private static final LocalDate DATE = LocalDate.of(2026, 12, 1);
