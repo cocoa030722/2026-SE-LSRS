@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useAuth } from '../auth/useAuth.js';
 import { Role } from '../constants/roles.js';
 import { paths } from '../router/paths.js';
@@ -21,7 +21,8 @@ const NAV_ITEMS = {
 
 /** 로그인 사용자 공통 레이아웃. 역할에 따라 메뉴를 바꾼다. */
 export default function MainLayout() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const navItems = NAV_ITEMS[user?.role] ?? [];
 
   return (
@@ -37,8 +38,13 @@ export default function MainLayout() {
         </nav>
         <div className="app-user">
           <span>{user?.loginId}</span>
-          {/* TODO(US-02, FR-U-14): onClick 에서 useAuth().logout 호출 후 로그인 화면으로 이동 */}
-          <button type="button">
+          <button
+            type="button"
+            onClick={async () => {
+              await logout();
+              navigate(paths.login, { replace: true });
+            }}
+          >
             로그아웃
           </button>
         </div>

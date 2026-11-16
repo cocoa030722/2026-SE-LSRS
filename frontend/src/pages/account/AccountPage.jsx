@@ -1,32 +1,52 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import PageHeader from '../../components/common/PageHeader.jsx';
-import Placeholder from '../../components/common/Placeholder.jsx';
+import ErrorMessage from '../../components/common/ErrorMessage.jsx';
+import { userApi } from '../../api/userApi.js';
 import { useAuth } from '../../auth/useAuth.js';
 import { Role } from '../../constants/roles.js';
+import { paths } from '../../router/paths.js';
+import { parseApiError } from '../../utils/apiError.js';
 
-/** 내 계정: 비밀번호 변경(US-03, 공통) · 회원 탈퇴(US-04, 학생) */
+/** 내 계정: 비밀번호 변경(US-03, Sprint 2) · 회원 탈퇴(US-04, 학생) */
 export default function AccountPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  /** US-04 AC1·2: 탈퇴 성공 시 로그아웃, 진행 중 예약·이용 제한이면 서버 안내를 보여 주고 계정은 유지된다 */
+  const withdraw = async () => {
+    if (!window.confirm('정말 탈퇴할까요? 개인정보가 비식별화되며 되돌릴 수 없습니다.')) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await userApi.withdraw();
+      await logout();
+      navigate(paths.login, { replace: true });
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <>
       <PageHeader title="내 계정" stories={['US-03', 'US-04']} />
-      <Placeholder
-        name="ChangePasswordForm"
-        story="US-03"
-        todos={[
-          '기존·새 비밀번호 입력 → 변경 후 즉시 로그아웃 (AC1)',
-          '기존 비밀번호 오류·규칙 미충족 사유 안내 (AC2)',
-        ]}
-      />
+      <section className="panel">
+        <h3>비밀번호 변경</h3>
+        <p className="hint">비밀번호 변경·재설정(US-03)은 Sprint 2에서 제공합니다.</p>
+      </section>
       {user?.role === Role.STUDENT && (
-        <Placeholder
-          name="WithdrawSection"
-          story="US-04"
-          todos={[
-            '탈퇴 확인 후 userApi.withdraw → 로그아웃 (AC1)',
-            '진행 중 예약·이용 제한 시 거부 안내 (AC2)',
-          ]}
-        />
+        <section className="panel danger-zone">
+          <h3>회원 탈퇴</h3>
+          <p className="hint">진행 중인 예약이 있거나 이용 제한(패널티) 중이면 탈퇴할 수 없습니다.</p>
+          <button type="button" className="danger" disabled={submitting} onClick={withdraw}>
+            {submitting ? '처리 중…' : '회원 탈퇴'}
+          </button>
+          <ErrorMessage error={error} />
+        </section>
       )}
     </>
   );

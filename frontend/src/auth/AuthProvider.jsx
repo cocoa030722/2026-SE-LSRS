@@ -1,33 +1,46 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AuthContext } from './authContext.js';
+import { decodeUser, tokenStorage } from './tokenStorage.js';
+import { authApi } from '../api/authApi.js';
 import { env } from '../config/env.js';
 
 function initialUser() {
-  // [개발 전용] 로그인 구현 전 화면 확인용. .env.local 에 VITE_DEV_MOCK_ROLE=STUDENT|ADMIN
+  const token = tokenStorage.getAccessToken();
+  if (token) {
+    const restored = decodeUser(token);
+    if (restored) return restored;
+    tokenStorage.clear(); // 만료·손상된 토큰
+  }
+  // [개발 전용] .env.local 에 VITE_DEV_MOCK_ROLE=STUDENT|ADMIN 이면 토큰 없이 메뉴만 확인한다
   if (env.devMockRole) {
     return { loginId: `dev-${env.devMockRole.toLowerCase()}`, role: env.devMockRole };
   }
-  // TODO(US-02): 저장된 토큰이 있으면 사용자 정보(역할)를 복원한다.
   return null;
 }
 
 export function AuthProvider({ children }) {
-  const [user] = useState(initialUser);
+  const [user, setUser] = useState(initialUser);
+
+  /** US-02 AC1: 로그인 → Access 토큰 저장 → 사용자(역할)를 토큰에서 복원. 실패하면 서버 오류를 그대로 던진다. */
+  const login = useCallback(async ({ loginId, password }) => {
+    const response = await authApi.login({ loginId, password });
+    const accessToken = response.data?.accessToken;
+    const loggedIn = accessToken ? decodeUser(accessToken) : null;
+    if (!loggedIn) throw new Error('로그인 응답을 해석할 수 없습니다.');
+    tokenStorage.save({ accessToken });
+    setUser(loggedIn);
+    return loggedIn;
+  }, []);
+
+  /** FR-U-14: 저장된 토큰을 지운다 (서버 측 로그아웃 API 는 없다: Sprint 2) */
+  const logout = useCallback(async () => {
+    tokenStorage.clear();
+    setUser(null);
+  }, []);
 
   const value = useMemo(
-    () => ({
-      user,
-      isAuthenticated: user !== null,
-      // TODO(US-02 AC1·2): authApi.login 호출 → tokenStorage.save → user 설정
-      login: async () => {
-        throw new Error('TODO(US-02): 로그인 미구현');
-      },
-      // TODO(US-02, FR-U-14): authApi.logout 호출 → tokenStorage.clear → user 초기화
-      logout: async () => {
-        throw new Error('TODO(US-02): 로그아웃 미구현');
-      },
-    }),
-    [user],
+    () => ({ user, isAuthenticated: user !== null, login, logout }),
+    [user, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
