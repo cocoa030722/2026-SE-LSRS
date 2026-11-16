@@ -96,17 +96,14 @@ public class User {
 	public UserStatus getStatus() {
 		return status;
 	}
+
 	public int getNoShowCount() {
-            return noShowCount;
-     }
+		return noShowCount;
+	}
 
-        public LocalDateTime getRestrictedUntil() {
-            return restrictedUntil;
-        }
-
-        public int getTokenVersion() {
-            return tokenVersion;
-        }
+	public int getTokenVersion() {
+		return tokenVersion;
+	}
 
 	public LocalDateTime getRestrictedUntil() {
 		return restrictedUntil;

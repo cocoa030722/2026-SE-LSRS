@@ -20,4 +20,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	@Query("select u from User u where u.userId = :userId")
 	Optional<User> findByIdForUpdate(Long userId);
 
+	Optional<User> findByLoginId(String loginId);
+
+	Optional<User> findByEmail(String email);
+
+	boolean existsByLoginId(String loginId);
+
+	boolean existsByEmail(String email);
+
 }
