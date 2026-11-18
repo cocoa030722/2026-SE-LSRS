@@ -47,3 +47,8 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// Windows에서 System.out 한글(이메일 인증 토큰 안내)이 깨지지 않도록 bootRun JVM의 콘솔 출력을 UTF-8로 고정 (#8)
+tasks.named('bootRun') {
+	jvmArgs '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+}
