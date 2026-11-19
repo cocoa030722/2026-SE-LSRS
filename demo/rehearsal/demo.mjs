@@ -1,16 +1,35 @@
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const BASE = 'http://localhost:5173';
-const LOG = process.argv[2];
+
+// bootRun 로그 파일: 인자로 받은 경로 → 없으면 저장소 루트 기준으로 찾는다 (기본: 저장소 루트의 boot.log)
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const LOG = [process.argv[2], process.argv[2] && path.join(REPO_ROOT, process.argv[2]), path.join(REPO_ROOT, 'boot.log')]
+  .filter(Boolean)
+  .find((p) => fs.existsSync(p));
+if (!LOG) {
+  console.error(`bootRun 로그 파일을 찾을 수 없습니다: ${process.argv[2] ?? '(인자 없음)'}\n저장소 루트에서 .\\gradlew.bat bootRun *> boot.log 로 실행한 뒤, node demo.mjs ..\\..\\boot.log 로 실행하세요.`);
+  process.exit(1);
+}
+console.log('로그 파일:', LOG);
+// PowerShell 5.1 의 *> 리다이렉트는 UTF-16LE(BOM FF FE)로 저장한다
+const readLog = () => {
+  const buf = fs.readFileSync(LOG);
+  return buf[0] === 0xff && buf[1] === 0xfe ? buf.toString('utf16le') : buf.toString('utf8');
+};
 const PW = 'Passw0rd!';
 const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const now = new Date();
-const TODAY = fmt(now);
-const TMR = fmt(new Date(now.getTime() + 86400000));
-const D5 = fmt(new Date(now.getTime() + 5 * 86400000));
-const HOUR = String(now.getHours()).padStart(2, '0') + ':00';
-const HOUR2 = String(now.getHours() + 1).padStart(2, '0') + ':00';
+// 시연 날짜는 seed-demo.sql 과 같은 절대 날짜로 고정한다 (데모일 2026-11-19)
+const TODAY = '2026-11-19';
+const TMR = '2026-11-20';
+const D5 = '2026-11-24';
+// Seed 의 A-03 체크인 시간대 (11-19 20~22시)
+const HOUR = '20:00';
+const HOUR2 = '22:00';
 
 const browser = await chromium.launch({ executablePath: process.env.EDGE_PATH ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
 let pass = 0, fail = 0;
@@ -49,7 +68,13 @@ await check('AC2 인증 전 로그인 → 이메일 인증 안내 + 링크', asy
 await check('AC5 잘못된 토큰 → 오류', async () => {
   await N.goto(BASE + '/verify-email'); await N.getByLabel('인증 토큰').fill('wrong-token'); await N.getByRole('button', { name: '인증하기' }).click(); await has(N, '유효하지 않은 인증 토큰입니다.');
 });
-const token = [...fs.readFileSync(LOG, 'utf8').matchAll(/이메일 인증 토큰: (\S+)/g)].pop()[1];
+await new Promise((r) => setTimeout(r, 1000)); // 로그가 파일에 기록될 시간
+const token = [...readLog().matchAll(/이메일 인증 토큰: (\S+)/g)].pop()?.[1];
+if (!token) {
+  console.error(`로그에서 '이메일 인증 토큰'을 찾지 못했습니다: ${LOG}\n이 로그가 지금 실행 중인 bootRun의 로그인지 확인하세요.`);
+  await browser.close();
+  process.exit(1);
+}
 await check('AC2 올바른 토큰 → 인증 완료', async () => {
   await N.getByLabel('인증 토큰').fill(token); await N.getByRole('button', { name: '인증하기' }).click(); await has(N, '이메일 인증이 완료되었습니다.');
 });
@@ -69,24 +94,25 @@ await check('AC4 학생이 /admin/policies 접근 → 권한 없음', async () =
 
 console.log('--- (3) US-05');
 await check('AC1 정책 안내 + 20석 그리드', async () => { await has(A, '평상시 정책'); await has(A, '최대 이용 시간 4시간'); if ((await A.locator('.seat').count()) !== 20) throw new Error('좌석 수 ' + await A.locator('.seat').count()); });
-await check('AC2 내일 10~12: A-02 예약됨 + 선택 시 안내, 예약 버튼 없음', async () => {
+await check('AC2 11-20 10~12: A-02 예약됨 + 선택 시 안내, 예약 버튼 없음', async () => {
   await slot(A, TMR, '10:00', '12:00'); await A.waitForTimeout(500);
   if (!(await seat(A, 'A-02').getAttribute('class')).includes('seat--reserved')) throw new Error('A-02 not reserved');
   await seat(A, 'A-02').click(); await has(A, '이미 예약된 좌석입니다. 다른 좌석을 선택해 주세요.');
   if (await A.getByRole('button', { name: '예약하기' }).count()) throw new Error('예약 버튼이 보임');
 });
-await check('AC2 지금 시간대: A-03 사용 중 + 안내', async () => {
+await check('AC2 11-19 20~22: A-03 사용 중 + 안내', async () => {
   await slot(A, TODAY, HOUR, HOUR2); await A.waitForTimeout(500);
   if (!(await seat(A, 'A-03').getAttribute('class')).includes('seat--in_use')) throw new Error('A-03 not in_use');
   await seat(A, 'A-03').click(); await has(A, '사용 중인 좌석입니다.');
 });
 await check('AC4 예약 가능 기간 제한: 날짜 입력 max = +7일', async () => {
+  // 예약 가능 기간은 서버의 실제 날짜 기준이므로 이 점검만 실행일 기준으로 계산한다
   const max = await A.locator('input[type=date]').getAttribute('max'); const exp = fmt(new Date(now.getTime() + 7 * 86400000));
   if (max !== exp) throw new Error(`max=${max} expected ${exp}`);
 });
 
 console.log('--- (4) US-06');
-await check('AC1 학생A 내일 10~12 A-01 예약 → 확인 + 내 예약 색', async () => {
+await check('AC1 학생A 11-20 10~12 A-01 예약 → 확인 + 내 예약 색', async () => {
   await slot(A, TMR, '10:00', '12:00'); await A.waitForTimeout(400); await seat(A, 'A-01').click();
   await A.getByRole('button', { name: '예약하기' }).click(); await has(A, '예약이 완료되었습니다. A-01');
   await A.waitForTimeout(600); if (!(await seat(A, 'A-01').getAttribute('class')).includes('seat--mine')) throw new Error('A-01 not mine');
@@ -110,7 +136,7 @@ await check('관리자 로그인 → 정책 관리 화면', async () => { await 
 await check('AC4 시작일>종료일 거부', async () => {
   const f = ADM.locator('form.inline-form'); await f.getByLabel('시작일').fill(TMR); await f.getByLabel('종료일').fill(TODAY); await f.getByRole('button', { name: '등록' }).click(); await has(ADM, '시험 기간의 시작일은 종료일보다 늦을 수 없습니다.');
 });
-await check('AC1 시험 기간 오늘~+5일 등록', async () => {
+await check('AC1 시험 기간 11-19~11-24 등록', async () => {
   const f = ADM.locator('form.inline-form'); await f.getByLabel('시작일').fill(TODAY); await f.getByLabel('종료일').fill(D5); await f.getByRole('button', { name: '등록' }).click(); await has(ADM, '등록했습니다.');
 });
 await check('AC3 학생 화면: 시험 기간 정책 + 최대 3시간 명시', async () => {
