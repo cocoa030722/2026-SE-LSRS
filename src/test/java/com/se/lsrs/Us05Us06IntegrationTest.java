@@ -174,4 +174,33 @@ class Us05Us06IntegrationTest {
 			.isEqualTo(2);
 	}
 
+	@Test
+	void US06_다른_학생_좌석_예약_거부() throws Exception {
+		// 학생 1이 12-02 13~15 에 A-02 를 예약해 둔 상태(예약 11). 학생 4가 같은 좌석·시간대를 예약 → 409
+		loginAs(4L);
+		reserve(2, "2026-12-02T13:00:00", "2026-12-02T15:00:00").andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("SEAT_ALREADY_RESERVED"))
+			.andExpect(jsonPath("$.message").value("이미 예약된 좌석입니다."));
+
+		// 거부된 요청은 예약을 남기지 않는다
+		assertThat(jdbcTemplate.queryForObject("select count(*) from reservation where user_id = 4", Integer.class))
+			.isEqualTo(0);
+	}
+
+	@Test
+	void US06_같은_시간대_두_번째_예약_거부() throws Exception {
+		// 학생 4가 A-01 을 12-02 10~12 에 예약 → 201
+		loginAs(4L);
+		reserve(1, "2026-12-02T10:00:00", "2026-12-02T12:00:00").andExpect(status().isCreated());
+
+		// 겹치는 11~13시에 다른 좌석 A-02(이 시간대엔 비어 있음) → 409
+		reserve(2, "2026-12-02T11:00:00", "2026-12-02T13:00:00").andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("DUPLICATE_RESERVATION"))
+			.andExpect(jsonPath("$.message").value("같은 시간대에 이미 예약이 있습니다."));
+
+		// 거부된 요청은 예약을 남기지 않는다
+		assertThat(jdbcTemplate.queryForObject("select count(*) from reservation where user_id = 4", Integer.class))
+			.isEqualTo(1);
+	}
+
 }
