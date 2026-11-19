@@ -20,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.se.lsrs.common.error.BusinessException;
 import com.se.lsrs.common.error.ErrorCode;
+import com.se.lsrs.support.DemoLog;
 import com.se.lsrs.user.domain.Role;
 import com.se.lsrs.user.domain.User;
 import com.se.lsrs.user.domain.UserStatus;
@@ -54,6 +55,7 @@ class AuthServiceTest {
 	@Test
 	void 규칙을_충족한_비밀번호는_통과한다_US01_AC3() {
 		assertThatCode(() -> AuthService.validatePassword("Passw0rd!")).doesNotThrowAnyException();
+		DemoLog.allowed("E2 비밀번호 Passw0rd! → 규칙 충족 통과");
 	}
 
 	@Test
@@ -63,22 +65,29 @@ class AuthServiceTest {
 			.hasMessageContaining("8자 이상")
 			.hasMessageContaining("영문")
 			.hasMessageContaining("특수문자")
-			.satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+			.satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT))
+			.satisfies(e -> DemoLog.rejected("E2 비밀번호 1234 → 부족한 항목 모두 안내", e));
 		assertThatThrownBy(() -> AuthService.validatePassword("password1"))
-			.hasMessageContaining("보완할 항목: 특수문자");
+			.hasMessageContaining("보완할 항목: 특수문자")
+			.satisfies(e -> DemoLog.rejected("E2 비밀번호 password1 → 특수문자 안내", e));
 		assertThatThrownBy(() -> AuthService.validatePassword("Pass!word"))
-			.hasMessageContaining("보완할 항목: 숫자");
+			.hasMessageContaining("보완할 항목: 숫자")
+			.satisfies(e -> DemoLog.rejected("E2 비밀번호 Pass!word → 숫자 안내", e));
 		assertThatThrownBy(() -> AuthService.validatePassword("12345678!"))
-			.hasMessageContaining("보완할 항목: 영문");
+			.hasMessageContaining("보완할 항목: 영문")
+			.satisfies(e -> DemoLog.rejected("E2 비밀번호 12345678! → 영문 안내", e));
 		assertThatThrownBy(() -> AuthService.validatePassword("Pw0!"))
-			.hasMessageContaining("보완할 항목: 8자 이상");
+			.hasMessageContaining("보완할 항목: 8자 이상")
+			.satisfies(e -> DemoLog.rejected("E2 비밀번호 Pw0! → 8자 이상 안내", e));
 	}
 
 	@Test
 	void 규칙을_어긴_비밀번호는_가입되지_않는다_US01_AC3() {
 		assertThatThrownBy(() -> authService().signup("20260009", "s9@univ.ac.kr", "1234"))
-			.isInstanceOf(BusinessException.class);
+			.isInstanceOf(BusinessException.class)
+			.satisfies(e -> DemoLog.rejected("E2 비밀번호 1234로 회원가입 → 거부", e));
 		verify(userRepository, never()).save(any());
+		DemoLog.check("userRepository.save() 호출 0회 (가입 안 됨)");
 	}
 
 	@Test

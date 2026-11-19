@@ -42,6 +42,7 @@ import com.se.lsrs.reservation.dto.ReservationResponse;
 import com.se.lsrs.reservation.repository.ReservationRepository;
 import com.se.lsrs.seat.domain.Seat;
 import com.se.lsrs.seat.repository.SeatRepository;
+import com.se.lsrs.support.DemoLog;
 import com.se.lsrs.user.domain.User;
 import com.se.lsrs.user.repository.UserRepository;
 
@@ -149,6 +150,7 @@ class ReservationServiceTest {
 			order.verify(reservationRepository).existsActiveOverlapByUser(STUDENT_ID, startAt, endAt, NOW);
 			order.verify(reservationRepository).existsActiveOverlapBySeat(SEAT_ID, startAt, endAt, NOW);
 			order.verify(reservationRepository).save(any());
+			DemoLog.allowed("E2 정상 예약 → 학생 잠금 → 좌석 잠금 → 이용 제한 → 정책 → 본인 겹침 → 좌석 겹침 → 저장 순서 확인");
 		}
 
 		@Test
@@ -157,9 +159,11 @@ class ReservationServiceTest {
 				.validateReservation(startAt, endAt);
 
 			assertThatThrownBy(() -> reservationService.reserve(SEAT_ID, startAt, endAt))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DURATION_EXCEEDED);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DURATION_EXCEEDED)
+				.satisfies(e -> DemoLog.rejected("E2 정책 위반(최대 시간 초과) 예약 → 거부", e));
 			verify(reservationRepository, never()).existsActiveOverlapByUser(any(), any(), any(), any());
 			verify(reservationRepository, never()).save(any());
+			DemoLog.check("겹침 조회·save() 호출 0회 (저장 안 함)");
 		}
 
 		@Test
@@ -167,8 +171,10 @@ class ReservationServiceTest {
 			LocalDateTime started = NOW.withHour(9);
 
 			assertThatThrownBy(() -> reservationService.reserve(SEAT_ID, started, started.plusHours(2)))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME)
+				.satisfies(e -> DemoLog.rejected("E2 현재 10시에 09시 시작 예약 → 이미 시작된 시간대 거부", e));
 			verify(reservationRepository, never()).save(any());
+			DemoLog.check("save() 호출 0회 (저장 안 함)");
 		}
 
 		@Test
@@ -255,6 +261,7 @@ class ReservationServiceTest {
 		reservationService.cancelByStudent(1L, CancelReason.OTHER);
 
 		verify(reservationRepository).cancelByStudent(1L, CancelReason.OTHER, START_AT_FROM);
+		DemoLog.allowed("E2 시작 시각이 정확히 '지금 − 15분'인 예약 취소 → 경계 안쪽 허용");
 	}
 
 	@Test
@@ -264,7 +271,8 @@ class ReservationServiceTest {
 
 		assertThatThrownBy(() -> reservationService.cancelByStudent(1L, CancelReason.OTHER))
 			.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_NOT_CANCELLABLE)
-			.hasMessageContaining("체크인 가능 시간");
+			.hasMessageContaining("체크인 가능 시간")
+			.satisfies(e -> DemoLog.rejected("E2 체크인 가능 시간이 1분 지난 예약 취소 → 경계 바깥 거부", e));
 		verify(reservationRepository, never()).cancelByStudent(anyLong(), any(), any());
 	}
 

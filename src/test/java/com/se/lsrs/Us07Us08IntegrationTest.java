@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.se.lsrs.common.auth.CurrentUserProvider;
+import com.se.lsrs.support.DemoLog;
 
 /**
  * US-07·08 전 계층 통합 테스트 (MySQL Testcontainers). 인증(US-02) 대신 CurrentUserProvider 를 대체한다.
@@ -117,18 +118,22 @@ class Us07Us08IntegrationTest {
 		mockMvc.perform(put("/api/reservations/11/cancel").contentType(MediaType.APPLICATION_JSON)
 			.content(json("{'reason':'OTHER'}")))
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.message").value("이미 취소된 예약입니다."));
+			.andExpect(jsonPath("$.message").value("이미 취소된 예약입니다."))
+			.andDo(DemoLog.api("E3 이미 취소한 예약 11을 다시 취소 → 409"));
 		mockMvc.perform(put("/api/reservations/10/cancel").contentType(MediaType.APPLICATION_JSON)
 			.content(json("{'reason':'OTHER'}")))
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.message").value("이미 체크인한 예약은 취소할 수 없습니다."));
+			.andExpect(jsonPath("$.message").value("이미 체크인한 예약은 취소할 수 없습니다."))
+			.andDo(DemoLog.api("E3 체크인 완료 예약 10 취소 → 409"));
 		mockMvc.perform(put("/api/reservations/13/cancel").contentType(MediaType.APPLICATION_JSON)
 			.content(json("{'reason':'OTHER'}")))
 			.andExpect(status().isNotFound())
-			.andExpect(jsonPath("$.code").value("RESERVATION_NOT_FOUND"));
+			.andExpect(jsonPath("$.code").value("RESERVATION_NOT_FOUND"))
+			.andDo(DemoLog.api("E3 학생1이 학생2의 예약 13 취소 → 404 (남의 예약은 없는 것으로 취급)"));
 		assertThat(jdbcTemplate.queryForObject("select status from reservation where reservation_id = 13",
 				String.class))
 			.isEqualTo("RESERVED");
+		DemoLog.check("DB에서 예약 13은 여전히 RESERVED (상태 변경 없음)");
 	}
 
 	@Test
@@ -149,10 +154,12 @@ class Us07Us08IntegrationTest {
 		// 관리자 전용: 학생은 403, 미인증은 401 (US-02 AC3·4, SecurityConfig)
 		mockMvc.perform(get("/api/admin/exam-periods").with(user("20260001").roles("STUDENT")))
 			.andExpect(status().isForbidden())
-			.andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+			.andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+			.andDo(DemoLog.api("E3 학생 역할로 관리자 API 호출 → 403"));
 		mockMvc.perform(get("/api/admin/exam-periods").with(anonymous()))
 			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+			.andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+			.andDo(DemoLog.api("E3 로그인 없이 관리자 API 호출 → 401"));
 
 		// AC4: 잘못된 기간·겹치는 기간 거부
 		mockMvc.perform(post("/api/admin/exam-periods").contentType(MediaType.APPLICATION_JSON)

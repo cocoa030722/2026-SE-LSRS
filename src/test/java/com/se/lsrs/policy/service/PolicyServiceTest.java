@@ -31,6 +31,7 @@ import com.se.lsrs.common.error.ErrorCode;
 import com.se.lsrs.policy.domain.PolicySetting;
 import com.se.lsrs.policy.repository.ExamPeriodRepository;
 import com.se.lsrs.policy.repository.PolicySettingRepository;
+import com.se.lsrs.support.DemoLog;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -139,6 +140,7 @@ class PolicyServiceTest {
 		void 평상시_7일째_4시간은_허용() {
 			LocalDate day = TODAY.plusDays(7);
 			assertThatCode(() -> policyService.validateReservation(at(day, 9), at(day, 13))).doesNotThrowAnyException();
+			DemoLog.allowed("E2 평상시 +7일(12-08)에 4시간 예약 → 경계 안쪽 허용");
 		}
 
 		@Test
@@ -148,21 +150,24 @@ class PolicyServiceTest {
 				.isInstanceOf(BusinessException.class)
 				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY)
 				.hasMessageContaining("평상시")
-				.hasMessageContaining(TODAY.plusDays(7).toString());
+				.hasMessageContaining(TODAY.plusDays(7).toString())
+				.satisfies(e -> DemoLog.rejected("E2 평상시 +8일(12-09) 예약 → 경계 바깥 거부", e));
 		}
 
 		@Test
 		void 지난_날짜는_거부() {
 			LocalDate day = TODAY.minusDays(1);
 			assertThatThrownBy(() -> policyService.validateReservation(at(day, 9), at(day, 10)))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY)
+				.satisfies(e -> DemoLog.rejected("E2 어제 날짜 예약 → 거부", e));
 		}
 
 		@Test
 		void 평상시_5시간은_거부() {
 			assertThatThrownBy(() -> policyService.validateReservation(at(TODAY, 12), at(TODAY, 17)))
 				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DURATION_EXCEEDED)
-				.hasMessageContaining("4시간");
+				.hasMessageContaining("4시간")
+				.satisfies(e -> DemoLog.rejected("E2 평상시 5시간 예약(12~17시) → 경계 바깥 거부", e));
 		}
 
 		@Test
@@ -172,10 +177,12 @@ class PolicyServiceTest {
 
 			assertThatCode(() -> policyService.validateReservation(at(tomorrow, 9), at(tomorrow, 12)))
 				.doesNotThrowAnyException();
+			DemoLog.allowed("E2 시험 기간 다음 날 3시간 예약 → 경계 안쪽 허용");
 			assertThatThrownBy(() -> policyService.validateReservation(at(tomorrow, 9), at(tomorrow, 13)))
 				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DURATION_EXCEEDED)
 				.hasMessageContaining("시험 기간")
-				.hasMessageContaining("3시간");
+				.hasMessageContaining("3시간")
+				.satisfies(e -> DemoLog.rejected("E2 시험 기간 다음 날 4시간 예약 → 경계 바깥 거부", e));
 		}
 
 		@Test
@@ -185,7 +192,8 @@ class PolicyServiceTest {
 
 			assertThatThrownBy(() -> policyService.validateReservation(at(day, 9), at(day, 10)))
 				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY)
-				.hasMessageContaining("시험 기간");
+				.hasMessageContaining("시험 기간")
+				.satisfies(e -> DemoLog.rejected("E2 시험 기간에 모레 예약 → 거부", e));
 		}
 
 	}
@@ -199,30 +207,36 @@ class PolicyServiceTest {
 			assertThatCode(() -> policyService.validateTimeSlot(at(TODAY, 5), at(TODAY, 7))).doesNotThrowAnyException();
 			assertThatCode(() -> policyService.validateTimeSlot(at(TODAY, 22), TODAY.plusDays(1).atStartOfDay()))
 				.doesNotThrowAnyException();
+			DemoLog.allowed("E2 운영 시간 양 끝(05~07시, 22~24시) 예약 → 경계 안쪽 허용");
 		}
 
 		@Test
 		void 운영_시간_밖이면_거부한다() {
 			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 4), at(TODAY, 6)))
 				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME)
-				.hasMessageContaining("05:00~24:00");
+				.hasMessageContaining("05:00~24:00")
+				.satisfies(e -> DemoLog.rejected("E2 04~06시 예약 → 운영 시간 밖 거부", e));
 			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 23), TODAY.plusDays(1).atTime(1, 0)))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME)
+				.satisfies(e -> DemoLog.rejected("E2 23~01시 예약 → 운영 시간 밖 거부", e));
 		}
 
 		@Test
 		void 정시가_아니면_거부한다() {
 			assertThatThrownBy(() -> policyService.validateTimeSlot(TODAY.atTime(13, 30), at(TODAY, 15)))
 				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME)
-				.hasMessageContaining("정시");
+				.hasMessageContaining("정시")
+				.satisfies(e -> DemoLog.rejected("E2 13:30 시작 예약 → 정시 아님 거부", e));
 		}
 
 		@Test
 		void 종료가_시작보다_늦지_않으면_거부한다() {
 			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 15), at(TODAY, 15)))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME)
+				.satisfies(e -> DemoLog.rejected("E2 15~15시 예약 → 종료 = 시작 거부", e));
 			assertThatThrownBy(() -> policyService.validateTimeSlot(at(TODAY, 15), at(TODAY, 13)))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_RESERVATION_TIME)
+				.satisfies(e -> DemoLog.rejected("E2 15~13시 예약 → 종료 < 시작 거부", e));
 		}
 
 		@Test
@@ -243,10 +257,13 @@ class PolicyServiceTest {
 		@Test
 		void 예약_가능_기간_밖의_날짜는_조회도_거부한다_US05_AC4() {
 			assertThat(policyService.validateReservableDate(TODAY.plusDays(7)).maxHours()).isEqualTo(4);
+			DemoLog.allowed("E2 좌석 조회 +7일 → 경계 안쪽 허용");
 			assertThatThrownBy(() -> policyService.validateReservableDate(TODAY.plusDays(8)))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY)
+				.satisfies(e -> DemoLog.rejected("E2 좌석 조회 +8일 → 경계 바깥 거부", e));
 			assertThatThrownBy(() -> policyService.validateReservableDate(TODAY.minusDays(1)))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESERVATION_DATE_OUT_OF_POLICY)
+				.satisfies(e -> DemoLog.rejected("E2 좌석 조회 어제 → 거부", e));
 		}
 
 	}
@@ -262,7 +279,8 @@ class PolicyServiceTest {
 
 			assertThatThrownBy(() -> policyService.updateSetting("CLOSE_HOUR", "25"))
 				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_POLICY_VALUE)
-				.hasMessageContaining("1~24");
+				.hasMessageContaining("1~24")
+				.satisfies(e -> DemoLog.rejected("E2 마감 시각을 25시로 변경 → 거부", e));
 		}
 
 		@Test
@@ -288,9 +306,11 @@ class PolicyServiceTest {
 				.willReturn(Optional.of(new PolicySetting("NORMAL_MAX_HOURS", "4", null)));
 
 			assertThatThrownBy(() -> policyService.updateSetting("NORMAL_MAX_HOURS", "abc"))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_POLICY_VALUE);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_POLICY_VALUE)
+				.satisfies(e -> DemoLog.rejected("E2 최대 시간을 abc로 변경 → 거부", e));
 			assertThatThrownBy(() -> policyService.updateSetting("NORMAL_MAX_HOURS", "0"))
-				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_POLICY_VALUE);
+				.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_POLICY_VALUE)
+				.satisfies(e -> DemoLog.rejected("E2 최대 시간을 0으로 변경 → 최솟값 미만 거부", e));
 		}
 
 		@Test
@@ -301,6 +321,7 @@ class PolicyServiceTest {
 			policyService.updateSetting("EXAM_DAYS", "0");
 
 			assertThat(setting.getPolicyValue()).isEqualTo("0");
+			DemoLog.allowed("E2 기간 값을 0일로 변경 → 경계 안쪽 허용");
 		}
 
 	}

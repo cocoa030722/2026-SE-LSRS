@@ -26,6 +26,7 @@ import com.se.lsrs.reservation.domain.ReservationStatus;
 import com.se.lsrs.reservation.dto.MyReservationResponse;
 import com.se.lsrs.reservation.dto.ReservationResponse;
 import com.se.lsrs.reservation.service.ReservationService;
+import com.se.lsrs.support.DemoLog;
 
 // 컨트롤러 매핑·검증·오류 응답만 확인한다. 보안 필터(SecurityConfig)는 통합 테스트(Us05Us06·Us07Us08)에서 검증한다.
 @WebMvcTest(ReservationController.class)
@@ -66,10 +67,12 @@ class ReservationControllerTest {
 			.content("{\"startAt\":\"2026-12-01T13:00:00\",\"endAt\":\"2026-12-01T15:00:00\"}"))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_INPUT"))
-			.andExpect(jsonPath("$.message").value("좌석을 선택해 주세요."));
+			.andExpect(jsonPath("$.message").value("좌석을 선택해 주세요."))
+			.andDo(DemoLog.api("E3 좌석 없이 예약 요청 → 400"));
 		mockMvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content("{\"seatId\":3}"))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+			.andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+			.andDo(DemoLog.api("E3 시간대 없이 예약 요청 → 400"));
 	}
 
 	@Test
@@ -132,7 +135,8 @@ class ReservationControllerTest {
 	void 없는_상태값은_400() throws Exception {
 		mockMvc.perform(get("/api/reservations/me").param("status", "NOPE"))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+			.andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+			.andDo(DemoLog.api("E3 없는 상태값으로 내 예약 조회 → 400"));
 	}
 
 	@Test
@@ -152,7 +156,8 @@ class ReservationControllerTest {
 		mockMvc.perform(put("/api/reservations/1/cancel").contentType(MediaType.APPLICATION_JSON).content("{}"))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_INPUT"))
-			.andExpect(jsonPath("$.message").value("취소 사유를 선택해 주세요."));
+			.andExpect(jsonPath("$.message").value("취소 사유를 선택해 주세요."))
+			.andDo(DemoLog.api("E3 사유 없이 예약 취소 → 400"));
 	}
 
 	@Test
