@@ -41,7 +41,11 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 			""")
 	boolean existsActiveOverlapBySeat(Long seatId, LocalDateTime startAt, LocalDateTime endAt, LocalDateTime now);
 
-	/** 학생에게 [startAt, endAt) 와 겹치는 진행 중 예약이 있는지 (US-06 AC2, FR-R-11). 학생 행 잠금 뒤 호출한다. */
+	/**
+	 * 학생에게 [startAt, endAt) 와 겹치는 진행 중 예약이 있는지 (US-06 AC2, FR-R-11). 학생 행 잠금 뒤 호출한다.
+	 * {@code r.endAt > :now} 는 이미 끝난 예약 제외, 마지막 줄은 시간 범위 겹침 조건이다.
+	 * (JPQL 문자열 안에는 // 주석을 쓸 수 없다: HQL 파서가 구문 오류로 앱 기동을 막는다)
+	 */
 	@Query("""
 			select count(r) > 0 from Reservation r
 			where r.user.userId = :userId
