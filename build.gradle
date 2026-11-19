@@ -46,6 +46,8 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 예외 케이스 테스트의 출력(DemoLog: 실제 API 응답·오류 메시지)이 Windows에서 깨지지 않도록 UTF-8로 고정
+	jvmArgs '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
 }
 
 // Windows에서 System.out 한글(이메일 인증 토큰 안내)이 깨지지 않도록 bootRun JVM의 콘솔 출력을 UTF-8로 고정 (#8)

@@ -21,6 +21,7 @@ import com.se.lsrs.common.auth.CurrentUserProvider;
 import com.se.lsrs.common.error.ErrorCode;
 import com.se.lsrs.policy.domain.ExamPeriod;
 import com.se.lsrs.policy.repository.ExamPeriodRepository;
+import com.se.lsrs.support.DemoLog;
 import com.se.lsrs.user.domain.User;
 import com.se.lsrs.user.repository.UserRepository;
 
@@ -62,13 +63,16 @@ class ExamPeriodServiceTest {
 		given(examPeriodRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
 		assertThat(examPeriodService.create(START, START).getEndDate()).isEqualTo(START);
+		DemoLog.allowed("E2 시작일 = 종료일인 하루짜리 시험 기간 등록 → 경계 안쪽 허용");
 	}
 
 	@Test
 	void 시작일이_종료일보다_늦으면_거부_AC4() {
 		assertThatThrownBy(() -> examPeriodService.create(END, START))
-			.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_EXAM_PERIOD);
+			.hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_EXAM_PERIOD)
+			.satisfies(e -> DemoLog.rejected("E2 시작일 > 종료일인 시험 기간 등록 → 거부", e));
 		verify(examPeriodRepository, never()).save(any());
+		DemoLog.check("save() 호출 0회 (저장 안 함)");
 	}
 
 	@Test

@@ -33,6 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.se.lsrs.common.auth.CurrentUserProvider;
 import com.se.lsrs.common.error.BusinessException;
 import com.se.lsrs.reservation.service.ReservationService;
+import com.se.lsrs.support.DemoLog;
 
 /**
  * 동시 예약 20건에서 이중 배정 0건 (US-06 AC4, 설계서 1장 성공 기준). 실제 MySQL 잠금을 검증하므로
@@ -129,6 +130,8 @@ class ReservationConcurrencyTest {
 
 		assertThat(outcomes).containsEntry("OK", 1L).containsEntry("SEAT_ALREADY_RESERVED", 19L).hasSize(2);
 		assertThat(activeReservations("seat_id = 1")).isEqualTo(1);
+		DemoLog.concurrent("E1 학생 20명이 같은 좌석(1번)·같은 시간대를 동시에 예약", outcomes,
+				"DB에서 좌석 1번의 진행 중 예약 1건 (이중 배정 0건)");
 	}
 
 	@Test
@@ -137,6 +140,8 @@ class ReservationConcurrencyTest {
 
 		assertThat(outcomes).containsEntry("OK", 1L).containsEntry("DUPLICATE_RESERVATION", 19L).hasSize(2);
 		assertThat(activeReservations("user_id = 1")).isEqualTo(1);
+		DemoLog.concurrent("E1 한 학생이 같은 시간대에 좌석 20개를 동시에 예약", outcomes,
+				"DB에서 학생 1번의 진행 중 예약 1건");
 	}
 
 }

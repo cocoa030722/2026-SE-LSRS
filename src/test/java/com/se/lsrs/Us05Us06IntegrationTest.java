@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.se.lsrs.common.auth.CurrentUserProvider;
+import com.se.lsrs.support.DemoLog;
 
 /**
  * US-05·06 전 계층 통합 테스트 (MySQL Testcontainers). 인증(US-02) 대신 CurrentUserProvider 를 대체한다.
@@ -180,27 +181,32 @@ class Us05Us06IntegrationTest {
 		loginAs(4L);
 		reserve(2, "2026-12-02T13:00:00", "2026-12-02T15:00:00").andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("SEAT_ALREADY_RESERVED"))
-			.andExpect(jsonPath("$.message").value("이미 예약된 좌석입니다."));
+			.andExpect(jsonPath("$.message").value("이미 예약된 좌석입니다."))
+			.andDo(DemoLog.api("E1 다른 학생이 예약한 좌석(A-02)을 같은 시간대에 예약 → 409"));
 
 		// 거부된 요청은 예약을 남기지 않는다
 		assertThat(jdbcTemplate.queryForObject("select count(*) from reservation where user_id = 4", Integer.class))
 			.isEqualTo(0);
+		DemoLog.check("거부된 요청은 DB에 남지 않음 (학생 4 예약 0건)");
 	}
 
 	@Test
-	void US06_같은_시간대_두_번째_예약_거부() throws Exception {
+	void 	US06_같은_시간대_두_번째_예약_거부() throws Exception {
 		// 학생 4가 A-01 을 12-02 10~12 에 예약 → 201
 		loginAs(4L);
-		reserve(1, "2026-12-02T10:00:00", "2026-12-02T12:00:00").andExpect(status().isCreated());
+		reserve(1, "2026-12-02T10:00:00", "2026-12-02T12:00:00").andExpect(status().isCreated())
+			.andDo(DemoLog.api("E1 첫 예약: A-01 10~12시 → 201"));
 
 		// 겹치는 11~13시에 다른 좌석 A-02(이 시간대엔 비어 있음) → 409
 		reserve(2, "2026-12-02T11:00:00", "2026-12-02T13:00:00").andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("DUPLICATE_RESERVATION"))
-			.andExpect(jsonPath("$.message").value("같은 시간대에 이미 예약이 있습니다."));
+			.andExpect(jsonPath("$.message").value("같은 시간대에 이미 예약이 있습니다."))
+			.andDo(DemoLog.api("E1 같은 시간대 두 번째 예약: A-02 11~13시 → 409"));
 
 		// 거부된 요청은 예약을 남기지 않는다
 		assertThat(jdbcTemplate.queryForObject("select count(*) from reservation where user_id = 4", Integer.class))
 			.isEqualTo(1);
+		DemoLog.check("거부된 요청은 DB에 남지 않음 (학생 4 예약 1건)");
 	}
 
 }
