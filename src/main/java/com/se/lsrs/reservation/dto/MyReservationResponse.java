@@ -13,7 +13,7 @@ import com.se.lsrs.reservation.domain.ReservationStatus;
  */
 public record MyReservationResponse(Long reservationId, String seatNo, LocalDateTime startAt, LocalDateTime endAt,
 		ReservationStatus status, CancelReason cancelReason, boolean cancellable) {
-
+	//정적 팩토리 메소드: Reservation 엔티티-> 응답용 DTO 변환
 	public static MyReservationResponse of(Reservation reservation, boolean cancellable) {
 		return new MyReservationResponse(reservation.getReservationId(), reservation.getSeat().getSeatNo(),
 				reservation.getStartAt(), reservation.getEndAt(), reservation.getStatus(),

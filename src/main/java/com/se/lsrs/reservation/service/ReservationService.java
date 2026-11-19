@@ -134,9 +134,11 @@ public class ReservationService {
 			.orElseThrow(() -> new BusinessException(ErrorCode.RESERVATION_NOT_FOUND));
 
 		LocalDateTime startAtFrom = cancellableStartAtFrom();
+
 		if (!isCancellable(reservation, startAtFrom)) {
 			throw new BusinessException(ErrorCode.RESERVATION_NOT_CANCELLABLE, notCancellableMessage(reservation));
 		}
+		// 취소에 실패한 경우
 		if (reservationRepository.cancelByStudent(reservationId, reason, startAtFrom) == 0) {
 			throw new BusinessException(ErrorCode.RESERVATION_NOT_CANCELLABLE);
 		}
